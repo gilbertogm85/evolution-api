@@ -85,6 +85,14 @@ export class SendMediaDto extends Metadata {
 
 export class SendProductDto extends Metadata {
   productId: string;
+  title?: string;
+  description?: string;
+  currencyCode?: string;
+  priceAmount1000?: number;
+  imageUrl?: string;
+  productImageCount?: number;
+  retailerId?: string;
+  url?: string;
   body?: string;
   footer?: string;
 }

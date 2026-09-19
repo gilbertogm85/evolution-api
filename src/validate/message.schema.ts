@@ -128,6 +128,14 @@ export const productMessageSchema: JSONSchema7 = {
   properties: {
     number: { ...numberDefinition },
     productId: { type: 'string', minLength: 1 },
+    title: { type: 'string' },
+    description: { type: 'string' },
+    currencyCode: { type: 'string' },
+    priceAmount1000: { type: 'number' },
+    imageUrl: { type: 'string' },
+    productImageCount: { type: 'number' },
+    retailerId: { type: 'string' },
+    url: { type: 'string' },
     body: { type: 'string' },
     footer: { type: 'string' },
     delay: {

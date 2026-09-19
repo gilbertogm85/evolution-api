@@ -2675,13 +2675,27 @@ export class BaileysStartupService extends ChannelStartupService {
       throw new BadRequestException(info ?? 'Number is not on WhatsApp');
     }
 
-    const catalog = await this.fetchCatalog(this.instance.name, {
-      number: this.client?.user?.id,
-      limit: 50,
-    });
-    const product = catalog.catalog?.find(
-      (item: Product) => item.id === data.productId || item.retailerId === data.productId,
+    const hasDirectProduct = Boolean(
+      data.title && data.imageUrl && data.currencyCode && typeof data.priceAmount1000 === 'number',
     );
+
+    const product = hasDirectProduct
+      ? ({
+          id: data.productId,
+          name: data.title,
+          description: data.description ?? '',
+          currency: data.currencyCode,
+          price: data.priceAmount1000 / 10,
+          imageUrls: { primary: data.imageUrl },
+          retailerId: data.retailerId,
+          url: data.url,
+        } as unknown as Product)
+      : (
+          await this.fetchCatalog(this.instance.name, {
+            number: this.client?.user?.id,
+            limit: 50,
+          })
+        ).catalog?.find((item: Product) => item.id === data.productId || item.retailerId === data.productId);
 
     if (!product) {
       throw new NotFoundException(`Product ${data.productId} not found in the instance catalog`);
@@ -2703,7 +2717,7 @@ export class BaileysStartupService extends ChannelStartupService {
         priceAmount1000: Math.round(product.price * 10),
         retailerId: product.retailerId,
         url: product.url,
-        productImageCount: Object.keys(product.imageUrls ?? {}).length,
+        productImageCount: data.productImageCount ?? Object.keys(product.imageUrls ?? {}).length,
       },
       businessOwnerJid: this.client?.user?.id ?? info.jid,
       body: data.body,
