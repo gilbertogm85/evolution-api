@@ -1,8 +1,9 @@
 import { RouterBroker } from '@api/abstract/abstract.router';
 import { NumberDto } from '@api/dto/chat.dto';
+import { getProductDto } from '@api/dto/business.dto';
 import { businessController } from '@api/server.module';
 import { createMetaErrorResponse } from '@utils/errorResponse';
-import { catalogSchema, collectionsSchema } from '@validate/validate.schema';
+import { catalogSchema, collectionsSchema, productSchema } from '@validate/validate.schema';
 import { RequestHandler, Router } from 'express';
 
 import { HttpStatus } from './index.router';
@@ -47,6 +48,24 @@ export class BusinessRouter extends RouterBroker {
 
           // Use utility function to create standardized error response
           const errorResponse = createMetaErrorResponse(error, 'business_collections');
+          return res.status(errorResponse.status).json(errorResponse);
+        }
+      })
+
+      .post(this.routerPath('getProduct'), ...guards, async (req, res) => {
+        try {
+          const response = await this.dataValidate<getProductDto>({
+            request: req,
+            schema: productSchema,
+            ClassRef: getProductDto,
+            execute: (instance, data) => businessController.fetchProduct(instance, data),
+          });
+
+          return res.status(HttpStatus.OK).json(response);
+        } catch (error) {
+          console.error('Business product error:', error);
+
+          const errorResponse = createMetaErrorResponse(error, 'business_product');
           return res.status(errorResponse.status).json(errorResponse);
         }
       });

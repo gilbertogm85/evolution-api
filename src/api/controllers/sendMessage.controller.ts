@@ -7,6 +7,7 @@ import {
   SendLocationDto,
   SendMediaDto,
   SendPollDto,
+  SendProductDto,
   SendPtvDto,
   SendReactionDto,
   SendStatusDto,
@@ -48,6 +49,10 @@ export class SendMessageController {
       return await this.waMonitor.waInstances[instanceName].mediaMessage(data, file);
     }
     throw new BadRequestException('Owned media must be a url or base64');
+  }
+
+  public async sendProduct({ instanceName }: InstanceDto, data: SendProductDto) {
+    return await this.waMonitor.waInstances[instanceName].productMessage(data);
   }
 
   public async sendPtv({ instanceName }: InstanceDto, data: SendPtvDto, file?: any) {

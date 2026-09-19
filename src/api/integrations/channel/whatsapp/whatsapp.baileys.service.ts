@@ -1,4 +1,4 @@
-import { getCollectionsDto } from '@api/dto/business.dto';
+import { getCatalogDto, getCollectionsDto, getProductDto } from '@api/dto/business.dto';
 import { OfferCallDto } from '@api/dto/call.dto';
 import {
   ArchiveChatDto,
@@ -44,6 +44,7 @@ import {
   SendLocationDto,
   SendMediaDto,
   SendPollDto,
+  SendProductDto,
   SendPtvDto,
   SendReactionDto,
   SendStatusDto,
@@ -2663,6 +2664,64 @@ export class BaileysStartupService extends ChannelStartupService {
     );
   }
 
+  public async productMessage(data: SendProductDto, isIntegration = false) {
+    if (!data.productId?.trim()) {
+      throw new BadRequestException('Product ID is required');
+    }
+
+    const info = (await this.whatsappNumber({ numbers: [data.number] }))?.shift();
+
+    if (!info?.exists) {
+      throw new BadRequestException(info ?? 'Number is not on WhatsApp');
+    }
+
+    const catalog = await this.fetchCatalog(this.instance.name, {
+      number: this.client?.user?.id,
+      limit: 50,
+    });
+    const product = catalog.catalog?.find(
+      (item: Product) => item.id === data.productId || item.retailerId === data.productId,
+    );
+
+    if (!product) {
+      throw new NotFoundException(`Product ${data.productId} not found in the instance catalog`);
+    }
+
+    const imageUrl = Object.values(product.imageUrls ?? {}).find((url) => Boolean(url));
+
+    if (!imageUrl) {
+      throw new BadRequestException('The product has no image and cannot be sent as a product card');
+    }
+
+    const productContent: AnyMessageContent = {
+      product: {
+        productImage: { url: imageUrl },
+        productId: product.id,
+        title: product.name,
+        description: product.description,
+        currencyCode: product.currency,
+        priceAmount1000: Math.round(product.price * 10),
+        retailerId: product.retailerId,
+        url: product.url,
+        productImageCount: Object.keys(product.imageUrls ?? {}).length,
+      },
+      businessOwnerJid: this.client?.user?.id ?? info.jid,
+      body: data.body,
+      footer: data.footer,
+    };
+
+    return await this.sendMessageWithTyping(
+      data.number,
+      productContent,
+      {
+        delay: data.delay,
+        presence: 'composing',
+        quoted: data.quoted,
+      },
+      isIntegration,
+    );
+  }
+
   private async formatStatusMessage(status: StatusMessage) {
     if (!status.type) {
       throw new BadRequestException('Type is required');
@@ -4899,7 +4958,7 @@ export class BaileysStartupService extends ChannelStartupService {
   }
 
   //Business Controller
-  public async fetchCatalog(instanceName: string, data: getCollectionsDto) {
+  public async fetchCatalog(instanceName: string, data: getCatalogDto) {
     const jid = data.number ? createJid(data.number) : this.client?.user?.id;
     const limit = data.limit || 10;
     const cursor = null;
@@ -4947,6 +5006,24 @@ export class BaileysStartupService extends ChannelStartupService {
       console.log(error);
       return { wuid: jid, name: null, isBusiness: false };
     }
+  }
+
+  public async fetchProduct(instanceName: string, data: getProductDto) {
+    const catalog = await this.fetchCatalog(instanceName, data);
+    const product = catalog.catalog?.find(
+      (item: Product) => item.id === data.productId || item.retailerId === data.productId,
+    );
+
+    if (!product) {
+      throw new NotFoundException(`Product ${data.productId} not found in the instance catalog`);
+    }
+
+    return {
+      wuid: catalog.wuid,
+      numberExists: catalog.numberExists,
+      isBusiness: catalog.isBusiness,
+      product,
+    };
   }
 
   public async getCatalog({

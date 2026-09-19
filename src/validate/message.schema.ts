@@ -122,6 +122,23 @@ export const mediaMessageSchema: JSONSchema7 = {
   required: ['number', 'mediatype'],
 };
 
+export const productMessageSchema: JSONSchema7 = {
+  $id: v4(),
+  type: 'object',
+  properties: {
+    number: { ...numberDefinition },
+    productId: { type: 'string', minLength: 1 },
+    body: { type: 'string' },
+    footer: { type: 'string' },
+    delay: {
+      type: 'integer',
+      description: 'Enter a value in milliseconds',
+    },
+    quoted: { ...quotedOptionsSchema },
+  },
+  required: ['number', 'productId'],
+};
+
 export const ptvMessageSchema: JSONSchema7 = {
   $id: v4(),
   type: 'object',

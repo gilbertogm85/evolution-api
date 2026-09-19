@@ -8,6 +8,10 @@ export class getCatalogDto {
   cursor?: string;
 }
 
+export class getProductDto extends getCatalogDto {
+  productId: string;
+}
+
 export class getCollectionsDto {
   number?: string;
   limit?: number;

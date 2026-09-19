@@ -83,6 +83,12 @@ export class SendMediaDto extends Metadata {
   media: string;
 }
 
+export class SendProductDto extends Metadata {
+  productId: string;
+  body?: string;
+  footer?: string;
+}
+
 export class SendPtvDto extends Metadata {
   video: string;
 }
