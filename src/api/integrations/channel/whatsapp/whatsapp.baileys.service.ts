@@ -5011,8 +5011,11 @@ export class BaileysStartupService extends ChannelStartupService {
       // may remain pending on WhatsApp when the account is addressed by its LID.
       // Go straight to the catalog query for the own catalog.
       const business = isOwnCatalog ? { isBusiness: true } : await this.fetchBusinessProfile(jid);
+      // WhatsApp's catalog IQ query still expects the phone JID (PN) for the
+      // connected account. The LID is kept above for the catalog owner/result.
+      const catalogJid = isOwnCatalog ? jidNormalizedUser(this.client?.user?.id ?? jid) : jid;
 
-      let catalog = await this.getCatalog({ jid, limit, cursor });
+      let catalog = await this.getCatalog({ jid: catalogJid, limit, cursor });
       let nextPageCursor = catalog.nextPageCursor;
       let nextPageCursorJson = nextPageCursor ? JSON.parse(atob(nextPageCursor)) : null;
       let pagination = nextPageCursorJson?.pagination_cursor
@@ -5023,7 +5026,7 @@ export class BaileysStartupService extends ChannelStartupService {
       let productsCatalog = catalog.products || [];
       let countLoops = 0;
       while (fetcherHasMore && countLoops < 4) {
-        catalog = await this.getCatalog({ jid: info?.jid, limit, cursor: nextPageCursor });
+        catalog = await this.getCatalog({ jid: catalogJid, limit, cursor: nextPageCursor });
         nextPageCursor = catalog.nextPageCursor;
         nextPageCursorJson = nextPageCursor ? JSON.parse(atob(nextPageCursor)) : null;
         pagination = nextPageCursorJson?.pagination_cursor
