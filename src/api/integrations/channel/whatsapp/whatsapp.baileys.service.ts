@@ -2730,7 +2730,7 @@ export class BaileysStartupService extends ChannelStartupService {
         url: product.url,
         productImageCount: data.productImageCount ?? Object.keys(product.imageUrls ?? {}).length,
       },
-      businessOwnerJid: this.client?.user?.id ?? info.jid,
+      businessOwnerJid: this.client?.user?.lid ?? this.client?.user?.id ?? info.jid,
       body: data.body,
       footer: data.footer,
     };
