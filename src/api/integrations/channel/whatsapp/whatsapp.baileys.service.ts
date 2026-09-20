@@ -5007,7 +5007,10 @@ export class BaileysStartupService extends ChannelStartupService {
 
     try {
       const info = onWhatsapp;
-      const business = await this.fetchBusinessProfile(jid);
+      // The business-profile query is not needed for the connected account and
+      // may remain pending on WhatsApp when the account is addressed by its LID.
+      // Go straight to the catalog query for the own catalog.
+      const business = isOwnCatalog ? { isBusiness: true } : await this.fetchBusinessProfile(jid);
 
       let catalog = await this.getCatalog({ jid, limit, cursor });
       let nextPageCursor = catalog.nextPageCursor;
