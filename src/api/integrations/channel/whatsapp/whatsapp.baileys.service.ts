@@ -4988,21 +4988,28 @@ export class BaileysStartupService extends ChannelStartupService {
 
   //Business Controller
   public async fetchCatalog(instanceName: string, data: getCatalogDto) {
-    const jid = data.number ? createJid(data.number) : this.client?.user?.id;
+    const requestedJid = data.number ? createJid(data.number) : undefined;
+    const ownJids = [this.client?.user?.id, this.client?.user?.lid]
+      .filter((value): value is string => Boolean(value))
+      .map((value) => jidNormalizedUser(value));
+    const isOwnCatalog = !requestedJid || ownJids.includes(jidNormalizedUser(requestedJid));
+    const jid = isOwnCatalog
+      ? jidNormalizedUser(this.client?.user?.lid ?? this.client?.user?.id ?? this.instance.wuid)
+      : requestedJid;
     const limit = data.limit || 10;
-    const cursor = null;
+    const cursor = data.cursor;
 
-    const onWhatsapp = (await this.whatsappNumber({ numbers: [jid] }))?.shift();
+    const onWhatsapp = isOwnCatalog ? { jid, exists: true } : (await this.whatsappNumber({ numbers: [jid] }))?.shift();
 
-    if (!onWhatsapp.exists) {
+    if (!onWhatsapp?.exists) {
       throw new BadRequestException(onWhatsapp);
     }
 
     try {
-      const info = (await this.whatsappNumber({ numbers: [jid] }))?.shift();
-      const business = await this.fetchBusinessProfile(info?.jid);
+      const info = onWhatsapp;
+      const business = await this.fetchBusinessProfile(jid);
 
-      let catalog = await this.getCatalog({ jid: info?.jid, limit, cursor });
+      let catalog = await this.getCatalog({ jid, limit, cursor });
       let nextPageCursor = catalog.nextPageCursor;
       let nextPageCursorJson = nextPageCursor ? JSON.parse(atob(nextPageCursor)) : null;
       let pagination = nextPageCursorJson?.pagination_cursor
@@ -5025,8 +5032,8 @@ export class BaileysStartupService extends ChannelStartupService {
       }
 
       return {
-        wuid: info?.jid || jid,
-        numberExists: info?.exists,
+        wuid: jid,
+        numberExists: info.exists,
         isBusiness: business.isBusiness,
         catalogLength: productsCatalog.length,
         catalog: productsCatalog,
