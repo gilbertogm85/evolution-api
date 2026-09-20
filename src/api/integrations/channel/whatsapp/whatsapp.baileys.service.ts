@@ -5017,23 +5017,12 @@ export class BaileysStartupService extends ChannelStartupService {
 
       let catalog = await this.getCatalog({ jid: catalogJid, limit, cursor });
       let nextPageCursor = catalog.nextPageCursor;
-      let nextPageCursorJson = nextPageCursor ? JSON.parse(atob(nextPageCursor)) : null;
-      let pagination = nextPageCursorJson?.pagination_cursor
-        ? JSON.parse(atob(nextPageCursorJson.pagination_cursor))
-        : null;
-      let fetcherHasMore = pagination?.fetcher_has_more === true ? true : false;
-
       let productsCatalog = catalog.products || [];
       let countLoops = 0;
-      while (fetcherHasMore && countLoops < 4) {
+      while (nextPageCursor && countLoops < 4) {
         catalog = await this.getCatalog({ jid: catalogJid, limit, cursor: nextPageCursor });
         nextPageCursor = catalog.nextPageCursor;
-        nextPageCursorJson = nextPageCursor ? JSON.parse(atob(nextPageCursor)) : null;
-        pagination = nextPageCursorJson?.pagination_cursor
-          ? JSON.parse(atob(nextPageCursorJson.pagination_cursor))
-          : null;
-        fetcherHasMore = pagination?.fetcher_has_more === true ? true : false;
-        productsCatalog = [...productsCatalog, ...catalog.products];
+        productsCatalog = [...productsCatalog, ...(catalog.products || [])];
         countLoops++;
       }
 
@@ -5076,13 +5065,74 @@ export class BaileysStartupService extends ChannelStartupService {
     try {
       jid = jid ? createJid(jid) : this.instance.wuid;
 
-      const catalog = await this.client.getCatalog({ jid, limit: limit, cursor: cursor });
+      // WhatsApp Web no longer answers the old w:biz:catalog IQ query used by
+      // Baileys. The web client now reads catalogs through this public GraphQL
+      // endpoint, which also works for LID-owned catalogs.
+      const response = await axios.post(
+        process.env.WHATSAPP_CATALOG_GRAPHQL_URL || 'https://graph.whatsapp.com/graphql/catalog',
+        {
+          access_token:
+            process.env.WHATSAPP_CATALOG_ACCESS_TOKEN || 'WA|787118555984857|7bb1544a3599aa180ac9a3f7688ba243',
+          doc_id: '30445081048424116',
+          lang: 'en_US',
+          variables: {
+            request: {
+              product_catalog: {
+                jid,
+                allow_shop_source: 'ALLOWSHOPSOURCE_TRUE',
+                width: '100',
+                height: '100',
+                limit: String(limit || 10),
+                after: cursor || null,
+                catalog_session_id: null,
+                direct_connection_encrypted_info: null,
+                variant_info_fields: null,
+                variant_thumbnail_height: null,
+                variant_thumbnail_width: null,
+              },
+            },
+          },
+        },
+        { timeout: 15_000 },
+      );
+
+      const catalog = response.data?.data?.xwa_product_catalog_get_product_catalog?.product_catalog;
 
       if (!catalog) {
-        return { products: undefined, nextPageCursor: undefined };
+        throw new Error('WhatsApp catalog response did not contain product_catalog');
       }
 
-      return catalog;
+      const products = (catalog.products || []).map((item: any) => {
+        const images = item.media?.images || [];
+        const imageUrls = images.reduce((urls: Record<string, string>, image: any, index: number) => {
+          const url = image.request_image_url || image.original_image_url;
+
+          if (url) {
+            urls[index === 0 ? 'primary' : `image_${index}`] = url;
+          }
+
+          return urls;
+        }, {});
+
+        return {
+          id: item.id,
+          imageUrls,
+          reviewStatus: { whatsapp: item.review_status || '' },
+          availability: 'in stock',
+          name: item.name,
+          retailerId: item.retailer_id,
+          url: item.url,
+          description: item.description || '',
+          price: Number(item.price || 0),
+          currency: item.currency,
+          isHidden: item.is_hidden === 'ISHIDDEN_TRUE' || item.is_hidden === true,
+        } as Product;
+      });
+
+      return {
+        products,
+        nextPageCursor: catalog.paging?.after || undefined,
+      };
     } catch (error) {
       throw new InternalServerErrorException('Error getCatalog', error.toString());
     }
