@@ -113,6 +113,7 @@ import makeWASocket, {
   GroupMetadata,
   isJidBroadcast,
   isJidGroup,
+  isJidMetaAI,
   isJidNewsletter,
   isPnUser,
   jidNormalizedUser,
@@ -665,8 +666,9 @@ export class BaileysStartupService extends ChannelStartupService {
         const isGroupJid = this.localSettings.groupsIgnore && isJidGroup(jid);
         const isBroadcast = !this.localSettings.readStatus && isJidBroadcast(jid);
         const isNewsletter = isJidNewsletter(jid);
+        const isMetaBot = isJidMetaAI(jid);
 
-        return isGroupJid || isBroadcast || isNewsletter;
+        return isGroupJid || isBroadcast || isNewsletter || isMetaBot;
       },
       syncFullHistory: this.localSettings.syncFullHistory,
       shouldSyncHistoryMessage: (msg: proto.Message.IHistorySyncNotification) => {
