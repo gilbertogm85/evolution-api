@@ -259,6 +259,7 @@ export class BaileysStartupService extends ChannelStartupService {
   private readonly UPDATE_CACHE_TTL_SECONDS = 30 * 60; // 30 minutes - avoid duplicate status updates
 
   public stateConnection: wa.StateConnection = { state: 'close' };
+  private lastCloseReason?: number;
 
   public phoneNumber: string;
 
@@ -430,6 +431,10 @@ export class BaileysStartupService extends ChannelStartupService {
       const codesToNotReconnect = [DisconnectReason.loggedOut, DisconnectReason.forbidden, 402, 406];
       const shouldReconnect = !codesToNotReconnect.includes(statusCode);
       if (shouldReconnect) {
+        this.lastCloseReason = statusCode;
+        this.logger.warn(
+          `Connection closed (${statusCode ?? 'no status'}: ${lastDisconnect?.error?.message ?? 'no message'}), reconnecting`,
+        );
         await this.connectToWhatsapp(this.phoneNumber);
       } else {
         this.sendDataWebhook(Events.STATUS_INSTANCE, {
@@ -467,6 +472,7 @@ export class BaileysStartupService extends ChannelStartupService {
     }
 
     if (connection === 'open') {
+      this.lastCloseReason = undefined;
       this.instance.wuid = this.client.user.id.replace(/:\d+/, '');
       try {
         const profilePic = await this.profilePicture(this.instance.wuid);
@@ -518,7 +524,11 @@ export class BaileysStartupService extends ChannelStartupService {
     }
 
     if (connection === 'connecting') {
-      this.sendDataWebhook(Events.CONNECTION_UPDATE, { instance: this.instance.name, ...this.stateConnection });
+      this.sendDataWebhook(Events.CONNECTION_UPDATE, {
+        instance: this.instance.name,
+        ...this.stateConnection,
+        statusReason: this.lastCloseReason ?? this.stateConnection.statusReason,
+      });
     }
   }
 
