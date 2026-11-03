@@ -728,6 +728,32 @@ export class BaileysStartupService extends ChannelStartupService {
       this.sendDataWebhook(Events.CALL, payload, true, ['websocket']);
     });
 
+    // Baileys has no handler for <status> stanzas (WhatsApp Status media), so they are never acked.
+    // WhatsApp then closes the stream with "500: Stream Errored (ack)" every ~50 minutes and
+    // redelivers the same stanza on reconnect, until it removes the device (401).
+    this.client.ws.on('CB:status', async (node: { tag: string; attrs: Record<string, string> }) => {
+      const attrs: Record<string, string> = { id: node.attrs.id, class: 'status' };
+
+      if (node.attrs.from) {
+        attrs.to = node.attrs.from;
+      }
+
+      if (node.attrs.type) {
+        attrs.type = node.attrs.type;
+      }
+
+      if (node.attrs.participant) {
+        attrs.participant = node.attrs.participant;
+      }
+
+      try {
+        await this.client.sendNode({ tag: 'ack', attrs });
+        this.logger.warn(`Acked status stanza ${JSON.stringify(node.attrs)}`);
+      } catch (error) {
+        this.logger.error(`Failed to ack status stanza ${JSON.stringify(node.attrs)}: ${error}`);
+      }
+    });
+
     this.phoneNumber = number;
 
     return this.client;
